@@ -3,6 +3,7 @@ import re
 import camelot
 import fitz
 import pandas as pd
+import pdfplumber
 import json
 from flask import Flask, jsonify, request
 
@@ -86,6 +87,72 @@ def extract_table():
             data["hanger"] = "Not Found"
 
         return jsonify({"success": True, "data": first_table_values, "text": text, 'keys': data})
+    else:
+        return jsonify({"success": False, "error": "Invalid file format. Only PDF files are supported."})
+
+
+@app.route('/extract_mrp', methods=['POST'])
+def extract_mrp():
+    if 'file' not in request.files:
+        return jsonify({"success": False, "error": "No file part"})
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"success": False, "error": "No selected file"})
+
+    if file and (file.filename.endswith('.pdf') or file.filename.endswith('.PDF')):
+        file_path = os.path.join("uploads", file.filename)
+        file.save(file_path)
+
+        # Read the uploaded PDF and extract all text
+        pdf_document = fitz.open(file_path)
+        text = ""
+        for page_num in range(pdf_document.page_count):
+            page = pdf_document[page_num]
+            text += page.get_text()
+
+        # getting the keys,
+        keys = [
+            "Order No",
+            "Ship From Date",
+            "Currency",
+            "Delivery Date",
+            "Payment Terms",
+            "Delivery Type",
+            "Supplier"
+        ]
+
+        data = {}
+        for key in keys:
+            pattern = r"{}:\s*([^\n]+)".format(key)
+            match = re.search(pattern, text)
+            if match:
+                data[key] = match.group(1)
+
+        # Split the text by lines
+        lines = text.split('\n')
+
+        # Find the index of the line that contains "Supplier:"
+        index_of_supplier = -1
+        for i, line in enumerate(lines):
+            if "Supplier:" in line:
+                index_of_supplier = i
+                break
+
+        # Extract the line below "Supplier:"
+        if index_of_supplier != -1 and index_of_supplier + 1 < len(lines):
+            below_supplier_line = lines[index_of_supplier + 1]
+        data["Supplier Name"] = below_supplier_line
+        # Special handling for "hanger" key
+        # try:
+        #     hanger_pattern = r"hanger\s*([\d.]+)"
+        #     hanger_match = re.search(hanger_pattern, text)
+        #     data["hanger"] = hanger_match.group(
+        #         1).strip() if hanger_match else "Not Found"
+        # except AttributeError:
+        #     data["hanger"] = "Not Found"
+
+        return jsonify({"success": True, "text": text, 'keys': data})
     else:
         return jsonify({"success": False, "error": "Invalid file format. Only PDF files are supported."})
 
