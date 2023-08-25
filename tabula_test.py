@@ -15,7 +15,6 @@ with pdfplumber.open("./uploads/PO285746 (1).pdf") as pdf:
     block_ended = False
 
     # Initialize a list to store the extracted block
-    desired_block = []
     desired_block1 = []
 
     # Iterate through pages
@@ -40,63 +39,80 @@ with pdfplumber.open("./uploads/PO285746 (1).pdf") as pdf:
                 block_ended = True
                 break
 
-        print(desired_block1)
-
         if block_ended:
             break
 
+# Use a list comprehension to keep items with the same length as the first item
+filtered_data = [desired_block1[0]] + [desired_block1[i]
+                                       for i in range(len(desired_block1)) if i % 2 != 0]
 
-# Combine the lines into a single string
-table_text = '\n'.join(desired_block)
-
-# Convert the table text into a Pandas DataFrame
-df = pd.read_csv(io.StringIO(table_text), delimiter="\t")
-
-# Print the DataFrame
-# print(df)
-
-# Convert the DataFrame to a list of dictionaries
-table_data_dict = df.to_dict(orient="records")
-
-# Convert the list of dictionaries to a JSON-formatted string
-json_data = json.dumps(table_data_dict, indent=4)
-
-# print(json_data)
-
-data_object = json.loads(json_data)
-
-# print(data_object)
+print(filtered_data)
 
 
-# Initialize an empty list to store the converted data
-converted_data = []
+def extract_values(data):
+    print(data)
 
-# Iterate through the input data
-for item in data_object:
-    # Get the single value from the dictionary
-    value = list(item.values())[0]
+    # Split the data string into values using whitespace as the separator
+    values = data.split()
 
-    # Split the string by spaces to extract individual values
-    values = value.split()
+    # Initialize a dictionary to store the extracted values
+    extracted_values = {}
 
-    # Create a dictionary with meaningful keys
-
-    # size = ' '.join(filter(lambda x: not x.replace(
-    #     '.', '', 1).isdigit(), values[1:]))
-    converted_item = {
-        "Line": values[0],
-        "Category": values[2],
-        "Item": int(values[-4]),
-        "Description": float(values[-3]),
-        "Colour": float(values[-2]),
-        "Style Number": float(values[-1]),
-        "Swing Tag": float(values[-2]),
-        "Order Quantity": values[-1]
+    # Define a dictionary to map keywords to their corresponding indexes in the split data
+    keyword_mapping = {
+        'Line': 0,
+        'Category': 1,
+        'Item': 2,
+        'Order Qty': -1
     }
 
-    # Append the converted item to the list
-    converted_data.append(converted_item)
+    # Iterate over the keyword_mapping dictionary to extract values
+    for keyword, index in keyword_mapping.items():
+        if index < len(values):
+            extracted_values[keyword] = values[index]
+        else:
+            extracted_values[keyword] = ""
 
-    # Print the converted data
-    for item in converted_data:
-        print(item)
+    description_pattern = rf'(?:{extracted_values["Item"]})(.*?)(?=\s+[A-Z][a-zA-Z]*[a-z])'
+    swingTag_pattern = r'(\S+)(?=\s*-\s*[^-]*$)'
+
+    # Extract "Description" using the regular expression pattern and convert it to uppercase
+    description_match = re.search(description_pattern, data)
+    swingTag_match = re.search(swingTag_pattern, data)
+
+    captured_description = ""
+    captured_swingTag = ""
+    captured_color = ""
+
+    if description_match:
+        captured_description = description_match.group(1)
+        print(captured_description)
+
+    if swingTag_match:
+        captured_swingTag = swingTag_match.group(1)
+        print(captured_swingTag)
+
+    color_pattern = rf'{captured_description} ([^\d]+) {captured_swingTag}'
+    color_match = re.search(color_pattern, data)
+
+    if (captured_description != "" and captured_swingTag != ""):
+
+        if color_match:
+            captured_color = color_match.group(1)
+            print(captured_color)
+
+    extracted_values['Description'] = captured_description
+    extracted_values['Swing Tag'] = captured_swingTag
+    extracted_values['Colour'] = captured_color
+
+    return extracted_values
+
+
+# Example data collection
+data_collection = filtered_data
+
+# Extract values from the example data collection
+values = extract_values(data_collection[1])
+
+# Print the extracted values
+print(values)
