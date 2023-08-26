@@ -6,6 +6,8 @@ import pandas as pd
 import pdfplumber
 import json
 from flask import Flask, jsonify, request
+from test import inner_table
+from tabula_test import outer_table
 
 app = Flask(__name__)
 
@@ -68,7 +70,8 @@ def extract_table():
             "Terms",
             'Payment Method',
             'Ship Method',
-            'hanger'
+            'hanger',
+            'PO Approval Date'
         ]
 
         data = {}
@@ -119,7 +122,8 @@ def extract_mrp():
             "Delivery Date",
             "Payment Terms",
             "Delivery Type",
-            "Supplier"
+            "Supplier",
+            'Originally Approved Date'
         ]
 
         data = {}
@@ -152,7 +156,11 @@ def extract_mrp():
         # except AttributeError:
         #     data["hanger"] = "Not Found"
 
-        return jsonify({"success": True, "text": text, 'keys': data})
+        inner_table_data = inner_table(file_path)
+
+        outer_table_data = outer_table(file_path)
+
+        return jsonify({"success": True, "text": text, 'keys': data, "inner_table": inner_table_data, "outer_table": outer_table_data})
     else:
         return jsonify({"success": False, "error": "Invalid file format. Only PDF files are supported."})
 
